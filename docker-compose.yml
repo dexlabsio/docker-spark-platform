@@ -1,0 +1,87 @@
+version: '3.8'
+
+services:
+  metastore:
+    build:
+      context: ./hive-metastore
+      dockerfile: Dockerfile
+    hostname: hive-metastore
+    container_name: hive-metastore
+    ports:
+      - "9083:9083"
+    environment:
+      - POSTGRES_USER=postgres
+      - POSTGRES_PASSWORD=postgres
+      - POSTGRES_DB=postgres
+      - PGPORT=9083
+    volumes:
+      - ./volumes/postgres_data:/var/lib/postgresql/data
+    networks:
+      - spark_network
+
+  spark:
+    build:
+      context: ./spark
+      dockerfile: Dockerfile
+    hostname: spark-master
+    container_name: spark-master
+    ports:
+      - "4040-4060:4040-4060"
+      - "6066-6076:6066-6076"
+      - "7001-7100:7001-7100"
+      - "7101-7200:7101-7200"
+      - "7301-7400:7301-7400"
+      - "8080-8090:8080-8090"
+      - "10000-10100:10000-10100"
+    volumes:
+      - ./volumes/spark_logs:/tmp/spark-events
+    depends_on:
+      - metastore
+      - minio
+    networks:
+      - spark_network
+
+  minio:
+    image: minio/minio:latest
+    hostname: minio
+    container_name: minio
+    ports:
+      - "9090:9000"
+      - "9091:9001"
+    volumes:
+      - ./volumes/minio_data:/data
+    environment:
+      - MINIO_ROOT_USER=minioadmin
+      - MINIO_ROOT_PASSWORD=minioadmin
+      - MINIO_ADDRESS=:9000
+      - MINIO_CONSOLE_ADDRESS=:9001
+    command: server /data
+    networks:
+      - spark_network
+
+  createbuckets:
+    image: minio/mc
+    depends_on:
+      - minio
+    environment:
+      - MINIO_ROOT_USER=minioadmin
+      - MINIO_ROOT_PASSWORD=minioadmin
+    entrypoint: >
+      /bin/sh -c "
+      sleep 10;
+      /usr/bin/mc config host add myminio http://minio:9000 minioadmin minioadmin;
+      /usr/bin/mc mb myminio/warehouse;
+      /usr/bin/mc anonymous set public myminio/warehouse;
+      exit 0;
+      "
+    networks:
+      - spark_network
+
+volumes:
+  spark_logs:
+  postgres_data:
+  minio_data:
+
+networks:
+  spark_network:
+    driver: bridge
