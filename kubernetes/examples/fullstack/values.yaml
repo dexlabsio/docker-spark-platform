@@ -55,6 +55,9 @@ spark:
           ConnectionPassword: "spark"
     fs:
       s3a:
-        endpoint: "http://myminio-hl.minio-operator.svc.cluster.local:9000"
-        accessKey: "1eP73tnAi2iNadd7mre0"
-        secretKey: "cBSZ37pyWu2NVIGkhyCSN15ZSdmt2jREutTgLgEt"
+        endpoint: "https://myminio-hl.minio-operator.svc.cluster.local:9000"
+        accessKey: "minio"
+        secretKey: "minio123"
+        connection:
+          ssl:
+            enabled: "true"

@@ -328,6 +328,9 @@ spark:
         secretKey: "minioadmin"
         pathStyleAccess: "true"
         impl: "org.apache.hadoop.fs.s3a.S3AFileSystem"
+        connection:
+          ssl:
+            enabled: "false"
 
   port:
     maxRetries: "100"

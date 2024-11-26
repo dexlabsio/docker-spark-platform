@@ -14,6 +14,9 @@ data:
     spark.driver.memory={{ .Values.spark.driver.memory | default "1g" }}
     spark.executor.cores={{ .Values.spark.executor.cores | default "1" }}
 
+    spark.driver.extraJavaOptions="-Dcom.amazonaws.sdk.disableCertChecking=true"
+    spark.executor.extraJavaOptions="-Dcom.amazonaws.sdk.disableCertChecking=true"
+
     spark.dynamicAllocation.enabled={{ .Values.spark.dynamicAllocation.enabled | default "true" }}
     spark.dynamicAllocation.minExecutors={{ .Values.spark.dynamicAllocation.minExecutors | default "1" }}
     spark.dynamicAllocation.maxExecutors={{ .Values.spark.dynamicAllocation.maxExecutors | default "2" }}
@@ -53,7 +56,8 @@ data:
     spark.hadoop.datanucleus.schema.validateConstraints={{ .Values.spark.hadoop.datanucleus.schema.validateConstraints | default "false" }}
 
     spark.sql.warehouse.dir={{ .Values.spark.sql.warehouse.dir | default "s3a://warehouse/" }}
-    spark.hadoop.fs.s3a.endpoint={{ .Values.spark.hadoop.fs.s3a.endpoint | default "http://minio:9000" }}
+    spark.hadoop.fs.s3a.endpoint={{ .Values.spark.hadoop.fs.s3a.endpoint | default "minio:9000" }}
+    spark.hadoop.fs.s3a.connection.ssl.enabled={{ .Values.spark.hadoop.fs.s3a.connection.ssl.enabled | default "false" }}
     spark.hadoop.fs.s3a.access.key={{ .Values.spark.hadoop.fs.s3a.accessKey | default "minioadmin" }}
     spark.hadoop.fs.s3a.secret.key={{ .Values.spark.hadoop.fs.s3a.secretKey | default "minioadmin" }}
     spark.hadoop.fs.s3a.path.style.access={{ .Values.spark.hadoop.fs.s3a.pathStyleAccess | default "true" }}
