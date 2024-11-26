@@ -1,0 +1,15 @@
+apiVersion: stackgres.io/v1
+kind: SGCluster
+metadata:
+  name: metastore
+  namespace: spark
+spec:
+  instances: 1
+  sgInstanceProfile: 'size-small'
+  configurations:
+    sgPoolingConfig: postgresql-pooling-config
+  postgres:
+    version: '14'
+  pods:
+    persistentVolume: 
+      size: '8Gi'

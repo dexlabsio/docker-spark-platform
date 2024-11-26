@@ -1,0 +1,9 @@
+apiVersion: stackgres.io/v1
+kind: SGInstanceProfile
+metadata:
+  name: size-small
+  namespace: spark
+spec:
+  cpu: "500m"
+  memory: "1Gi"
+

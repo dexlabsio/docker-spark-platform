@@ -1,0 +1,60 @@
+# We only support a standalone master deployment
+master:
+  resources:
+    limits:
+      cpu: 2
+      memory: 4Gi
+    requests:
+      cpu: 1
+      memory: 2Gi
+# Spark worker configuration
+worker:
+  replicaCount: 1
+  resources:
+    limits:
+      cpu: 2
+      memory: 4Gi
+    requests:
+      cpu: 1
+      memory: 3Gi
+
+# Thrift server configuration
+thriftserver:
+  replicaCount: 1
+  resources:
+    limits:
+      cpu: 2
+      memory: 4Gi
+    requests:
+      cpu: 1
+      memory: 3Gi
+
+# Shared config as environment variables between master and worker nodes
+config:
+  SPARK_WORKER_MEMORY: 10g
+  SPARK_WORKER_CORES: "4"
+  SPARK_DYNAMICALLOCATION_ENABLED: "true"
+  SPARK_DYNAMICALLOCATION_INITIALEXECUTORS: "1"
+  SPARK_DYNAMICALLOCATION_MINEXECUTORS: "1"
+  SPARK_DYNAMICALLOCATION_MAXEXECUTORS: "2"
+
+
+
+# Override spark defaults
+spark:
+  sql:
+    warehouse:
+      dir: "s3a://lakehouse/"
+
+  hadoop:
+    javax:
+      jdo:
+        option:
+          ConnectionURL: "jdbc:postgresql://metastore.spark.svc.cluster.local:5432/metastore"
+          ConnectionUserName: "spark"
+          ConnectionPassword: "spark"
+    fs:
+      s3a:
+        endpoint: "http://myminio-hl.minio-operator.svc.cluster.local:9000"
+        accessKey: "1eP73tnAi2iNadd7mre0"
+        secretKey: "cBSZ37pyWu2NVIGkhyCSN15ZSdmt2jREutTgLgEt"
