@@ -1,0 +1,122 @@
+apiVersion: apps/v1
+kind: Deployment
+metadata:
+  name: {{ include "spark-platform.fullname" . }}-thriftserver
+  labels:
+    app.kubernetes.io/role: thriftserver
+    {{- include "spark-platform.labels" . | nindent 4 }}
+spec:
+  {{- if not .Values.thriftserver.autoscaling.enabled }}
+  replicas: {{ .Values.thriftserver.replicaCount }}
+  {{- end }}
+  selector:
+    matchLabels:
+      app.kubernetes.io/role: thriftserver
+      {{- include "spark-platform.selectorLabels" . | nindent 6 }}
+  template:
+    metadata:
+      annotations:
+        checksum/config: '{{ include (print $.Template.BasePath "/env.yaml") . | sha256sum }}'
+        {{- with .Values.thriftserver.podAnnotations }}
+        {{- toYaml . | nindent 8 }}
+        {{- end }}
+      labels:
+        app.kubernetes.io/role: thriftserver
+        {{- include "spark-platform.labels" . | nindent 8 }}
+        {{- with .Values.thriftserver.podLabels }}
+        {{- toYaml . | nindent 8 }}
+        {{- end }}
+    spec:
+      {{- with .Values.imagePullSecrets }}
+      imagePullSecrets:
+        {{- toYaml . | nindent 8 }}
+      {{- end }}
+      serviceAccountName: {{ include "spark-platform.serviceAccountName" . }}
+      securityContext:
+        {{- toYaml .Values.thriftserver.podSecurityContext | nindent 8 }}
+      initContainers:
+        - name: init-permissions
+          image: busybox:latest
+          command: ["sh", "-c", "chmod 777 /tmp/spark-events"]
+          volumeMounts:
+            - name: spark-events
+              mountPath: /tmp/spark-events
+      containers:
+        - name: thriftserver
+          securityContext:
+            {{- toYaml .Values.thriftserver.securityContext | nindent 12 }}
+          image: "{{ .Values.thriftserver.image.repository }}:{{ .Values.thriftserver.image.tag | default .Chart.AppVersion }}"
+          imagePullPolicy: {{ .Values.thriftserver.image.pullPolicy }}
+          command: {{ .Values.thriftserver.image.command | toJson }}
+          {{- if gt (len .Values.worker.image.args) 0  }}
+          args: {{ .Values.thriftserver.image.args | toJson }}
+          {{- else }}
+          args:
+            - --master
+            - spark://{{ include "spark-platform.fullname" . }}-master-0.{{ include "spark-platform.fullname" . }}-master.{{ .Release.Namespace }}.svc.cluster.local:7077
+            - --conf
+            - spark.driver.bindAddress=$(SPARK_DRIVER_BIND_ADDRESS)
+            - --conf
+            - spark.driver.host=$(SPARK_DRIVER_HOST)
+          {{- end }}
+          ports:
+            - name: default
+              containerPort: 10000
+              protocol: TCP
+            - name: webui
+              containerPort: 4040
+              protocol: TCP
+          resources:
+            {{- toYaml .Values.thriftserver.resources | nindent 12 }}
+          {{- if .Values.config }}
+          envFrom:
+            - configMapRef:
+                name: {{ template "spark-platform.fullname" . }}-config
+          {{- end }}
+          env:
+          - name: SPARK_DRIVER_HOST
+            valueFrom:
+              fieldRef:
+                fieldPath: status.podIP          
+          - name: SPARK_DRIVER_BIND_ADDRESS
+            valueFrom:
+              fieldRef:
+                fieldPath: status.podIP
+          - name: SPARK_NO_DAEMONIZE
+            value: "true"
+          - name: SPARK_MASTER
+            value: "spark://{{ include "spark-platform.fullname" . }}-master-0.{{ include "spark-platform.fullname" . }}-master.{{ .Release.Namespace }}.svc.cluster.local:7077"
+          {{- if .Values.thriftserver.environment }}
+            {{- toYaml .Values.thriftserver.environment | nindent 12 }}
+          {{- end }}
+          volumeMounts:
+            - name: spark-events
+              mountPath: /tmp/spark-events
+            - name: spark-defaults
+              mountPath: /opt/spark/conf/spark-defaults.conf
+              subPath: spark-defaults.conf
+          {{- with .Values.thriftserver.volumeMounts }}
+            {{- toYaml . | nindent 12 }}
+          {{- end }}
+      volumes:
+        - name: spark-events
+          emptyDir: {}
+        - name: spark-defaults
+          configMap:
+            name: {{ include "spark-platform.fullname" . }}-defaults
+      {{- with .Values.thriftserver.volumes }}
+        {{- toYaml . | nindent 8 }}
+      {{- end }}
+
+      {{- with .Values.thriftserver.nodeSelector }}
+      nodeSelector:
+        {{- toYaml . | nindent 8 }}
+      {{- end }}
+      {{- with .Values.thriftserver.affinity }}
+      affinity:
+        {{- toYaml . | nindent 8 }}
+      {{- end }}
+      {{- with .Values.thriftserver.tolerations }}
+      tolerations:
+        {{- toYaml . | nindent 8 }}
+      {{- end }}

@@ -1,0 +1,37 @@
+---
+apiVersion: v1
+kind: Service
+metadata:
+  name: {{ include "spark-platform.fullname" . }}-master
+  labels:
+    app.kubernetes.io/role: master
+    {{- include "spark-platform.labels" . | nindent 4 }}
+spec:
+  type: ClusterIP
+  clusterIP: None
+  selector:
+    app.kubernetes.io/role: master
+    {{- include "spark-platform.selectorLabels" . | nindent 4 }}
+
+---
+apiVersion: v1
+kind: Service
+metadata:
+  name: {{ include "spark-platform.fullname" . }}-thriftserver
+  labels:
+    app.kubernetes.io/role: thriftserver
+    {{- include "spark-platform.labels" . | nindent 4 }}
+spec:
+  type: ClusterIP
+  ports:
+    - port: 10000
+      targetPort: default
+      protocol: TCP
+      name: default
+    - port: 80
+      targetPort: webui
+      protocol: TCP
+      name: webui
+  selector:
+    app.kubernetes.io/role: thriftserver
+    {{- include "spark-platform.selectorLabels" . | nindent 4 }}

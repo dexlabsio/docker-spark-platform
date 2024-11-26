@@ -1,0 +1,155 @@
+apiVersion: apps/v1
+kind: Deployment
+metadata:
+  name: {{ include "spark-platform.fullname" . }}-worker
+  labels:
+    app.kubernetes.io/role: worker
+    {{- include "spark-platform.labels" . | nindent 4 }}
+spec:
+  {{- if not .Values.worker.autoscaling.enabled }}
+  replicas: {{ .Values.worker.replicaCount }}
+  {{- end }}
+  selector:
+    matchLabels:
+      app.kubernetes.io/role: worker
+      {{- include "spark-platform.selectorLabels" . | nindent 6 }}
+  template:
+    metadata:
+      annotations:
+        checksum/config: '{{ include (print $.Template.BasePath "/env.yaml") . | sha256sum }}'
+        {{- with .Values.worker.podAnnotations }}
+        {{- toYaml . | nindent 8 }}
+        {{- end }}
+      labels:
+        app.kubernetes.io/role: worker
+        {{- include "spark-platform.labels" . | nindent 8 }}
+        {{- with .Values.worker.podLabels }}
+        {{- toYaml . | nindent 8 }}
+        {{- end }}
+    spec:
+      {{- with .Values.imagePullSecrets }}
+      imagePullSecrets:
+        {{- toYaml . | nindent 8 }}
+      {{- end }}
+      serviceAccountName: {{ include "spark-platform.serviceAccountName" . }}
+      securityContext:
+        {{- toYaml .Values.worker.podSecurityContext | nindent 8 }}
+      initContainers:
+        - name: init-permissions
+          image: busybox:latest
+          command: ["sh", "-c", "chmod 777 /tmp/spark-events"]
+          volumeMounts:
+            - name: spark-events
+              mountPath: /tmp/spark-events
+      containers:
+        - name: worker
+          securityContext:
+            {{- toYaml .Values.worker.securityContext | nindent 12 }}
+          image: "{{ .Values.worker.image.repository }}:{{ .Values.worker.image.tag | default .Chart.AppVersion }}"
+          imagePullPolicy: {{ .Values.worker.image.pullPolicy }}
+          command: {{ .Values.worker.image.command | toJson }}
+          {{- if gt (len .Values.worker.image.args) 0  }}
+          args: {{ .Values.worker.image.args | toJson }}
+          {{- else }}
+          args:
+            - "spark://{{ include "spark-platform.fullname" . }}-master-0.{{ include "spark-platform.fullname" . }}-master.{{ .Release.Namespace }}.svc.cluster.local:7077"
+          {{- end }}
+          ports:
+            - name: default
+              containerPort: 8081
+              protocol: TCP
+
+          # Spark UI Ports
+          {{- $minUIPort := .Values.spark.ui.minPort | int }}
+          {{- $maxUIPort := .Values.spark.ui.maxPort | int }}
+          {{- $deltaUIPort := sub $maxUIPort $minUIPort }}
+          {{- $rangeLimitUIPort := (add $deltaUIPort 1) | int }}
+          {{- range $port := until $rangeLimitUIPort }}
+            - name: webui-{{ add $port $minUIPort }}
+              containerPort: {{ add $port $minUIPort }}
+              protocol: TCP
+          {{- end }}
+
+          # BlockManager Ports
+          {{- $minBlockManagerPort := .Values.spark.blockManager.port.minRange | int }}
+          {{- $maxBlockManagerPort := .Values.spark.blockManager.port.maxRange | int }}
+          {{- $deltaBlockManagerPort := sub $maxBlockManagerPort $minBlockManagerPort }}
+          {{- $rangeLimitBlockManagerPort := (add $deltaBlockManagerPort 1) | int }}
+          {{- range $port := until $rangeLimitBlockManagerPort }}
+            - name: bm-{{ add $port $minBlockManagerPort }}
+              containerPort: {{ add $port $minBlockManagerPort }}
+              protocol: TCP
+          {{- end }}
+
+          # Executor Ports
+          {{- $minExecutorPort := .Values.spark.executor.port.minRange | int }}
+          {{- $maxExecutorPort := .Values.spark.executor.port.maxRange | int }}
+          {{- $deltaExecutorPort := sub $maxExecutorPort $minExecutorPort }}
+          {{- $rangeLimitExecutorPort := (add $deltaExecutorPort 1) | int }}
+          {{- range $port := until $rangeLimitExecutorPort }}
+            - name: exec-{{ add $port $minExecutorPort }}
+              containerPort: {{ add $port $minExecutorPort }}
+              protocol: TCP
+          {{- end }}
+
+          # Shuffle Ports
+          {{- $minShufflePort := .Values.spark.shuffle.service.port.minRange | int }}
+          {{- $maxShufflePort := .Values.spark.shuffle.service.port.maxRange | int }}
+          {{- $deltaShufflePort := sub $maxShufflePort $minShufflePort }}
+          {{- $rangeLimitShufflePort := (add $deltaShufflePort 1) | int }}
+          {{- range $port := until $rangeLimitShufflePort }}
+            - name: shf-{{ add $port $minShufflePort }}
+              containerPort: {{ add $port $minShufflePort }}
+              protocol: TCP
+          {{- end }}
+
+          resources:
+            {{- toYaml .Values.worker.resources | nindent 12 }}
+          {{- if .Values.config }}
+          envFrom:
+            - configMapRef:
+                name: {{ template "spark-platform.fullname" . }}-config
+          {{- end }}
+          env:
+          - name: SPARK_NO_DAEMONIZE
+            value: "true"
+          - name: SPARK_MASTER
+            value: "spark://{{ include "spark-platform.fullname" . }}-master-0.{{ include "spark-platform.fullname" . }}-master.{{ .Release.Namespace }}.svc.cluster.local:7077"
+          - name: SPARK_LOCAL_IP
+            valueFrom:
+              fieldRef:
+                fieldPath: status.podIP
+          {{- if .Values.worker.environment }}
+            {{- toYaml .Values.worker.environment | nindent 12 }}
+          {{- end }}
+          volumeMounts:
+            - name: spark-events
+              mountPath: /tmp/spark-events
+            - name: spark-defaults
+              mountPath: /opt/spark/conf/spark-defaults.conf
+              subPath: spark-defaults.conf
+          {{- with .Values.worker.volumeMounts }}
+            {{- toYaml . | nindent 12 }}
+          {{- end }}
+      volumes:
+        - name: spark-events
+          emptyDir: {}
+        - name: spark-defaults
+          configMap:
+            name: {{ include "spark-platform.fullname" . }}-defaults
+      {{- with .Values.worker.volumes }}
+        {{- toYaml . | nindent 8 }}
+      {{- end }}
+
+      {{- with .Values.worker.nodeSelector }}
+      nodeSelector:
+        {{- toYaml . | nindent 8 }}
+      {{- end }}
+      {{- with .Values.worker.affinity }}
+      affinity:
+        {{- toYaml . | nindent 8 }}
+      {{- end }}
+      {{- with .Values.worker.tolerations }}
+      tolerations:
+        {{- toYaml . | nindent 8 }}
+      {{- end }}

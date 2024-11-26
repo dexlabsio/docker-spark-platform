@@ -1,0 +1,125 @@
+apiVersion: apps/v1
+kind: StatefulSet
+metadata:
+  name: {{ include "spark-platform.fullname" . }}-master
+  labels:
+    app.kubernetes.io/role: master
+    {{- include "spark-platform.labels" . | nindent 4 }}
+spec:
+  serviceName: {{ include "spark-platform.fullname" . }}-master
+  replicas: 1
+  selector:
+    matchLabels:
+      app.kubernetes.io/role: master
+      {{- include "spark-platform.selectorLabels" . | nindent 6 }}
+  template:
+    metadata:
+      annotations:
+        checksum/config: '{{ include (print $.Template.BasePath "/env.yaml") . | sha256sum }}'
+        {{- with .Values.master.podAnnotations }}
+        {{- toYaml . | nindent 8 }}
+        {{- end }}
+      labels:
+        app.kubernetes.io/role: master
+        {{- include "spark-platform.labels" . | nindent 8 }}
+        {{- with .Values.master.podLabels }}
+        {{- toYaml . | nindent 8 }}
+        {{- end }}
+    spec:
+      {{- with .Values.imagePullSecrets }}
+      imagePullSecrets:
+        {{- toYaml . | nindent 8 }}
+      {{- end }}
+      serviceAccountName: {{ include "spark-platform.serviceAccountName" . }}
+      securityContext:
+        {{- toYaml .Values.master.podSecurityContext | nindent 8 }}
+      initContainers:
+        - name: init-permissions
+          image: busybox:latest
+          command: ["sh", "-c", "chmod 777 /tmp/spark-events"]
+          volumeMounts:
+            - name: spark-events
+              mountPath: /tmp/spark-events
+      containers:
+        - name: master
+          securityContext:
+            {{- toYaml .Values.master.securityContext | nindent 12 }}
+          image: "{{ .Values.master.image.repository }}:{{ .Values.master.image.tag | default .Chart.AppVersion }}"
+          imagePullPolicy: {{ .Values.master.image.pullPolicy }}
+          command: {{ .Values.master.image.command | toJson }}
+          args: {{ .Values.master.image.args | toJson }}
+          ports:
+            - name: default
+              containerPort: 7077
+              protocol: TCP
+            - name: rest
+              containerPort: 6066
+              protocol: TCP
+            - name: webui
+              containerPort: 8080
+              protocol: TCP
+          resources:
+            {{- toYaml .Values.master.resources | nindent 12 }}
+          {{- if .Values.config }}
+          envFrom:
+            - configMapRef:
+                name: {{ template "spark-platform.fullname" . }}-config
+          {{- end }}
+          env:
+          - name: SPARK_NO_DAEMONIZE
+            value: "true"
+          - name: SPARK_MASTER
+            value: "spark://{{ include "spark-platform.fullname" . }}-master.{{ .Release.Namespace }}.svc.cluster.local:7077"
+          - name: SPARK_LOCAL_IP
+            valueFrom:
+              fieldRef:
+                fieldPath: status.podIP
+          {{- if .Values.master.environment }}
+            {{- toYaml .Values.master.environment | nindent 12 }}
+          {{- end }}
+          volumeMounts:
+            - name: spark-events
+              mountPath: /tmp/spark-events
+            - name: spark-defaults
+              subPath: spark-defaults.conf
+              mountPath: /opt/spark/conf/spark-defaults.conf
+          {{- with .Values.master.volumeMounts }}
+            {{- toYaml . | nindent 12 }}
+          {{- end }}
+      volumes:
+        - name: spark-events
+          emptyDir: {}
+        - name: spark-defaults
+          configMap:
+            name: {{ include "spark-platform.fullname" . }}-defaults
+      {{- with .Values.master.volumes }}
+        {{- toYaml . | nindent 8 }}
+      {{- end }}
+      {{- with .Values.master.nodeSelector }}
+      nodeSelector:
+        {{- toYaml . | nindent 8 }}
+      {{- end }}
+      {{- with .Values.master.affinity }}
+      affinity:
+        {{- toYaml . | nindent 8 }}
+      {{- end }}
+      {{- with .Values.master.tolerations }}
+      tolerations:
+        {{- toYaml . | nindent 8 }}
+      {{- end }}
+  {{- if .Values.master.volumeClaimTemplates }}
+  volumeClaimTemplates:
+  {{- range .Values.master.volumeClaimTemplates }}
+  - metadata:
+      name: {{ .name }}
+      annotations:
+        {{- toYaml .annotations | nindent 8 }}
+    spec:
+      accessModes:
+      {{- toYaml .accessModes | nindent 8 }}
+      resources:
+        requests:
+          storage: {{ .resources.requests.storage }}
+      storageClassName: {{ .storageClassName | quote }}
+  {{- end }}
+  {{- end }}

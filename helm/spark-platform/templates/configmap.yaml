@@ -1,0 +1,83 @@
+apiVersion: v1
+kind: ConfigMap
+metadata:
+  name: {{ include "spark-platform.fullname" . }}-defaults
+  labels:
+    {{- include "spark-platform.labels" . | nindent 4 }}
+data:
+  spark-defaults.conf: |
+    {{ $defaultMaster := printf "spark://%s-master.%s.svc.cluster.local:7077" (include "spark-platform.fullname" .) .Release.Namespace }}
+    spark.master={{ .Values.spark.masterURL | default $defaultMaster }}
+    spark.eventLog.enabled={{ .Values.spark.eventLog.enabled | default "true" }}
+    spark.serializer={{ .Values.spark.serializer | default "org.apache.spark.serializer.KryoSerializer" }}
+    spark.executor.memory={{ .Values.spark.executor.memory | default "2g" }}
+    spark.driver.memory={{ .Values.spark.driver.memory | default "1g" }}
+    spark.executor.cores={{ .Values.spark.executor.cores | default "1" }}
+
+    spark.dynamicAllocation.enabled={{ .Values.spark.dynamicAllocation.enabled | default "true" }}
+    spark.dynamicAllocation.minExecutors={{ .Values.spark.dynamicAllocation.minExecutors | default "1" }}
+    spark.dynamicAllocation.maxExecutors={{ .Values.spark.dynamicAllocation.maxExecutors | default "2" }}
+    spark.dynamicAllocation.initialExecutors={{ .Values.spark.dynamicAllocation.initialExecutors | default "1" }}
+    spark.dynamicAllocation.shuffleTracking.enabled={{ .Values.spark.dynamicAllocation.shuffleTracking.enabled | default "true" }}
+
+    spark.shuffle.service.enabled={{ .Values.spark.shuffle.service.enabled | default "true" }}
+    spark.driver.extraClassPath={{ .Values.spark.driver.extraClassPath | default "/opt/spark/jars/*" }}
+
+    spark.eventLog.dir={{ .Values.spark.eventLog.dir | default "/tmp/spark-events" }}
+    spark.history.fs.logDirectory={{ .Values.spark.history.fs.logDirectory | default "/tmp/spark-events" }}
+
+    spark.sql.catalogImplementation={{ .Values.spark.sql.catalogImplementation | default "hive" }}
+    spark.sql.hive.metastore.version={{ .Values.spark.sql.hive.metastore.version | default "2.3.9" }}
+    spark.sql.hive.metastore.jars={{ .Values.spark.sql.hive.metastore.jars | default "maven" }}
+    spark.sql.hive.metastore.sharedPrefixes={{ .Values.spark.sql.hive.metastore.sharedPrefixes | default "com.postgresql,org.postgresql" }}
+
+    {{ $defaultThriftURI := printf "thrift://%s-thriftserver.%s.svc.cluster.local:10000" (include "spark-platform.fullname" .) .Release.Namespace }}
+    spark.sql.hive.metastore.uris={{ .Values.spark.sql.hive.metastore.uris | default $defaultThriftURI }}
+
+    spark.hadoop.mapreduce.fileoutputcommitter.algorithm.version={{ .Values.spark.hadoop.mapreduce.fileoutputcommitter.algorithm.version | default "2" }}
+
+    spark.hadoop.javax.jdo.option.ConnectionURL={{ .Values.spark.hadoop.javax.jdo.option.ConnectionURL | default "jdbc:postgresql://hive-metastore:9083/metastore" }}
+    spark.hadoop.javax.jdo.option.ConnectionDriverName={{ .Values.spark.hadoop.javax.jdo.option.ConnectionDriverName | default "org.postgresql.Driver" }}
+    spark.hadoop.javax.jdo.option.ConnectionUserName={{ .Values.spark.hadoop.javax.jdo.option.ConnectionUserName | default "spark" }}
+    spark.hadoop.javax.jdo.option.ConnectionPassword={{ .Values.spark.hadoop.javax.jdo.option.ConnectionPassword | default "spark" }}
+    spark.hadoop.javax.jdo.option.Mapping={{ .Values.spark.hadoop.javax.jdo.option.Mapping | default "postgres" }}
+
+    spark.hadoop.hive.metastore.schema.verification={{ .Values.spark.hadoop.hive.metastore.schema.verification.enabled | default "true" }}
+    spark.hadoop.hive.metastore.schema.verification.record.version={{ .Values.spark.hadoop.hive.metastore.schema.verification.record.version | default "false" }}
+    spark.hadoop.hive.server2.thrift.port={{ .Values.spark.hadoop.hive.server2.thrift.port | default "10000" }}
+
+    spark.hadoop.datanucleus.autoCreateSchema={{ .Values.spark.hadoop.datanucleus.autoCreateSchema | default "true" }}
+    spark.hadoop.datanucleus.fixedDatastore={{ .Values.spark.hadoop.datanucleus.fixedDatastore | default "false" }}
+    spark.hadoop.datanucleus.schema.autoCreateAll={{ .Values.spark.hadoop.datanucleus.schema.autoCreateAll | default "true" }}
+    spark.hadoop.datanucleus.schema.validateTables={{ .Values.spark.hadoop.datanucleus.schema.validateTables | default "false" }}
+    spark.hadoop.datanucleus.schema.validateConstraints={{ .Values.spark.hadoop.datanucleus.schema.validateConstraints | default "false" }}
+
+    spark.sql.warehouse.dir={{ .Values.spark.sql.warehouse.dir | default "s3a://warehouse/" }}
+    spark.hadoop.fs.s3a.endpoint={{ .Values.spark.hadoop.fs.s3a.endpoint | default "http://minio:9000" }}
+    spark.hadoop.fs.s3a.access.key={{ .Values.spark.hadoop.fs.s3a.accessKey | default "minioadmin" }}
+    spark.hadoop.fs.s3a.secret.key={{ .Values.spark.hadoop.fs.s3a.secretKey | default "minioadmin" }}
+    spark.hadoop.fs.s3a.path.style.access={{ .Values.spark.hadoop.fs.s3a.pathStyleAccess | default "true" }}
+    spark.hadoop.fs.s3a.impl={{ .Values.spark.hadoop.fs.s3a.impl | default "org.apache.hadoop.fs.s3a.S3AFileSystem" }}
+
+    spark.port.maxRetries={{ .Values.spark.port.maxRetries | default "100" }}
+    spark.ui.port.maxRetries={{ .Values.spark.ui.port.maxRetries | default "100" }}
+
+    spark.blockManager.port.minRange={{ .Values.spark.blockManager.port.minRange | default "10001" }}
+    spark.blockManager.port.maxRange={{ .Values.spark.blockManager.port.maxRange | default "10100" }}
+
+    spark.driver.port.minRange={{ .Values.spark.driver.port.minRange | default "7001" }}
+    spark.driver.port.maxRange={{ .Values.spark.driver.port.maxRange | default "7100" }}
+
+    spark.executor.port.minRange={{ .Values.spark.executor.port.minRange | default "7101" }}
+    spark.executor.port.maxRange={{ .Values.spark.executor.port.maxRange | default "7200" }}
+
+    spark.shuffle.service.port.minRange={{ .Values.spark.shuffle.service.port.minRange | default "7301" }}
+    spark.shuffle.service.port.maxRange={{ .Values.spark.shuffle.service.port.maxRange | default "7400" }}
+
+    spark.ui.minPort={{ .Values.spark.ui.minPort | default "4040" }}
+    spark.ui.maxPort={{ .Values.spark.ui.maxPort | default "4060" }}
+
+    spark.master.rest.port.minRange={{ .Values.spark.master.rest.port.minRange | default "6066" }}
+    spark.master.rest.port.maxRange={{ .Values.spark.master.rest.port.maxRange | default "6076" }}
+    spark.worker.port.minRange={{ .Values.spark.worker.port.minRange | default "8081" }}
+    spark.worker.port.maxRange={{ .Values.spark.worker.port.maxRange | default "8081" }}
